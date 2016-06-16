@@ -1,0 +1,185 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+
+</head>
+<body onload="loadCanvas()">
+    <canvas id="myCanvas" width="600" height="300"></canvas>
+    <script>
+
+    function ImageFrame(canvas){
+        this.canvas = canvas;
+        this.context = canvas.getContext('2d');
+        this.list = [];
+
+        this.add = function(image,options){
+            if(options.y_zigzag){
+                options.y_zigzag.min = image.original_position.y - options.y_zigzag.min;
+                options.y_zigzag.max = image.original_position.y + options.y_zigzag.max;
+            }
+
+            this.list.push({image: image,options: options});
+            var image_frame = this;
+            image.onload(function(object){
+                object.draw(image_frame.canvas);
+            });
+
+        };
+
+        this.start = function(){
+            var image_frame = this;
+
+            for(var k in this.list) this.list[k].direction = 'down';
+
+            var repeat = function(i){
+                var image, options, item, x, y, x_speed, y_speed, direction;
+
+                image_frame.context.clearRect(0, 0, image_frame.canvas.width, image_frame.canvas.height);
+
+                for(var k in image_frame.list){
+                    item = image_frame.list[k];
+                    image = item.image;
+                    options = item.options;
+
+                    if('on_move' in options && typeof options.on_move === 'function'){
+                        options.on_move(image,image_frame);
+                    }
+
+                    if(image.isAppended()){
+
+                        if(image.isMoving()){
+                            x_speed = options.x_speed;
+                            y_speed = options.y_speed;
+
+                            direction = item.direction;
+
+                            x = image.position.x;
+                            y = image.position.y;
+
+                            if(options.y_zigzag){
+                                if (direction == 'down'){
+                                    if (y <= options.y_zigzag.max)
+                                    y += speed;
+                                    else
+                                    image_frame.list[k].direction = 'up';
+                                }else if (direction == 'up'){
+                                    if (y >= options.y_zigzag.min)
+                                    y -= speed;
+                                    else
+                                    image_frame.list[k].direction = 'down';
+                                }
+                            }else y = y+y_speed;
+
+                            x = x+x_speed;
+
+                            image.position.x = x;
+                            image.position.y = y;
+                        }
+
+                        image_frame.context.drawImage(image.image,image.position.x,image.position.y,image.size.width,image.size.height);
+                    }
+                }
+
+                setTimeout(function(){
+                    repeat(i++);
+                },100);
+            }
+
+            repeat(0);
+        }
+    }
+
+    function ImageObject(url,width,height,x,y,canvas){
+        this.position = {x: x, y: y};
+        this.size = {width: width, height: height};
+
+        this.original_position = {x: x, y: y};
+        this.original_size = {width: width, height: height};
+
+        this.url = url;
+        this.canvas = canvas;
+
+        this.do_move = true;
+        this.do_append = true;
+
+        this.image = new Image();
+
+        this.stop = function(){
+            this.do_move = false;
+        }
+
+        this.move = function(){
+            this.do_move = false;
+        }
+
+        this.detach = function(){
+            this.do_append = false;
+        }
+
+        this.append = function(){
+            this.do_append = true;
+        }
+
+        this.isAppended = function(){
+            return this.do_append;
+        }
+
+        this.isMoving = function(){
+            return this.do_move;
+        }
+
+        this.draw = function(canvas){
+            var context;
+            if(!canvas) canvas = this.canvas;
+
+            context = canvas.getContext('2d');
+            context.drawImage(this.image,this.position.x,this.position.y,this.size.width,this.size.height);
+        }
+
+        this.onload = function(callback){
+            var object = this;
+            this.image.onload = function(){
+                callback(object);
+            }
+
+            this.image.src = url;
+        }
+
+    }
+    var IMAGE, IMAGE_S = true;
+    function loadCanvas(){
+        var canvas = document.getElementById('myCanvas');
+        var context = canvas.getContext('2d');
+
+        var image_frame = new ImageFrame(canvas);
+
+        var image_1 = new ImageObject('http://localhost/aviao.png',130,100,-100,50);
+        image_frame.add(image_1,{x_speed: 4, y_speed: 0, on_move: function(image,image_frame){
+            if(image.position.x > image_frame.canvas.width){
+                image.detach();
+                setTimeout(function(){
+                    image.position.x = (image.size.width * -1) - 20;
+                    image.append();
+                }, 1000);
+            }
+        }});
+
+        var image_2 = new ImageObject('http://localhost/aviao.png',130,100,-100,150);
+        setTimeout(function(){
+            image_frame.add(image_2,{x_speed: 4, y_speed: 0, on_move: function(image,image_frame){
+                if(image.position.x > image_frame.canvas.width){
+                    setTimeout(function(){
+                        image.position.x = (image.size.width * -1) - 20;
+                        image.append();
+                    }, 1000);
+                }
+            }});
+        }, 7500);
+
+        image_frame.start();
+    }
+
+    </script>
+</body>
+</html>
